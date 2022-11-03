@@ -176,6 +176,7 @@ func NewExampleStore() *MemoryStore {
 		DeviceCodesRequestIDs:  make(map[string]string),
 		UserCodesRequestIDs:    make(map[string]string),
 		IssuerPublicKeys:       map[string]IssuerPublicKeys{},
+		PARSessions:            map[string]fosite.AuthorizeRequester{},
 	}
 }
 
