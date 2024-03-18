@@ -29,7 +29,8 @@ func TestAuthorizeCode_PopulateTokenEndpointResponse(t *testing.T) {
 			store := storage.NewMemoryStore()
 
 			var h GenericCodeTokenEndpointHandler
-			for _, c := range []struct {
+
+			testCases := []struct {
 				areq        *fosite.AccessRequest
 				description string
 				setup       func(t *testing.T, areq *fosite.AccessRequest, config *fosite.Config)
@@ -173,8 +174,10 @@ func TestAuthorizeCode_PopulateTokenEndpointResponse(t *testing.T) {
 						assert.Equal(t, "foo", aresp.GetExtra("scope"))
 					},
 				},
-			} {
-				t.Run("case="+c.description, func(t *testing.T) {
+			}
+
+			for _, testCase := range testCases {
+				t.Run("case="+testCase.description, func(t *testing.T) {
 					config := &fosite.Config{
 						ScopeStrategy:            fosite.HierarchicScopeStrategy,
 						AudienceMatchingStrategy: fosite.DefaultAudienceMatchingStrategy,
@@ -195,21 +198,21 @@ func TestAuthorizeCode_PopulateTokenEndpointResponse(t *testing.T) {
 						Config:               config,
 					}
 
-					if c.setup != nil {
-						c.setup(t, c.areq, config)
+					if testCase.setup != nil {
+						testCase.setup(t, testCase.areq, config)
 					}
 
 					aresp := fosite.NewAccessResponse()
-					err := h.PopulateTokenEndpointResponse(context.Background(), c.areq, aresp)
+					err := h.PopulateTokenEndpointResponse(context.Background(), testCase.areq, aresp)
 
-					if c.expectErr != nil {
-						require.EqualError(t, err, c.expectErr.Error(), "%+v", err)
+					if testCase.expectErr != nil {
+						require.EqualError(t, err, testCase.expectErr.Error(), "%+v", err)
 					} else {
 						require.NoError(t, err, "%+v", err)
 					}
 
-					if c.check != nil {
-						c.check(t, aresp)
+					if testCase.check != nil {
+						testCase.check(t, aresp)
 					}
 				})
 			}
@@ -230,9 +233,8 @@ func TestAuthorizeCode_HandleTokenEndpointRequest(t *testing.T) {
 			}
 			h := GenericCodeTokenEndpointHandler{
 				AccessRequestValidator: &AuthorizeExplicitGrantAccessRequestValidator{},
-				CoreStorage:            store,
 				CodeHandler: &AuthorizeCodeHandler{
-					AuthorizeCodeStrategy: hmacshaStrategy,
+					AuthorizeCodeStrategy: strategy,
 				},
 				SessionHandler: &AuthorizeExplicitGrantSessionHandler{
 					AuthorizeCodeStorage: store,
@@ -240,7 +242,8 @@ func TestAuthorizeCode_HandleTokenEndpointRequest(t *testing.T) {
 				TokenRevocationStorage: store,
 				Config:                 config,
 			}
-			for i, c := range []struct {
+
+			testCases := []struct {
 				description string
 				areq        *fosite.AccessRequest
 				authreq     *fosite.AuthorizeRequest
@@ -428,21 +431,23 @@ func TestAuthorizeCode_HandleTokenEndpointRequest(t *testing.T) {
 					},
 					expectErr: fosite.ErrInvalidGrant,
 				},
-			} {
-				t.Run(fmt.Sprintf("case=%d/description=%s", i, c.description), func(t *testing.T) {
-					if c.setup != nil {
-						c.setup(t, c.areq, c.authreq)
+			}
+
+			for i, testCase := range testCases {
+				t.Run(fmt.Sprintf("case=%d/description=%s", i, testCase.description), func(t *testing.T) {
+					if testCase.setup != nil {
+						testCase.setup(t, testCase.areq, testCase.authreq)
 					}
 
-					t.Logf("Processing %+v", c.areq.Client)
+					t.Logf("Processing %+v", testCase.areq.Client)
 
-					err := h.HandleTokenEndpointRequest(context.Background(), c.areq)
-					if c.expectErr != nil {
-						require.EqualError(t, err, c.expectErr.Error(), "%+v", err)
+					err := h.HandleTokenEndpointRequest(context.Background(), testCase.areq)
+					if testCase.expectErr != nil {
+						require.EqualError(t, err, testCase.expectErr.Error(), "%+v", err)
 					} else {
 						require.NoError(t, err, "%+v", err)
-						if c.check != nil {
-							c.check(t, c.areq, c.authreq)
+						if testCase.check != nil {
+							testCase.check(t, testCase.areq, testCase.authreq)
 						}
 					}
 				})
@@ -484,7 +489,7 @@ func TestAuthorizeCodeTransactional_HandleTokenEndpointRequest(t *testing.T) {
 		AuthorizeCodeStorage
 	}
 
-	for _, testCase := range []struct {
+	testCases := []struct {
 		description string
 		setup       func()
 		expectError error
@@ -658,7 +663,9 @@ func TestAuthorizeCodeTransactional_HandleTokenEndpointRequest(t *testing.T) {
 			},
 			expectError: fosite.ErrServerError,
 		},
-	} {
+	}
+
+	for _, testCase := range testCases {
 		t.Run(fmt.Sprintf("scenario=%s", testCase.description), func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
